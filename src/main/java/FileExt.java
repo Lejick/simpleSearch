@@ -63,22 +63,69 @@ public class FileExt implements Comparable<FileExt> {
     }
 
     protected void simpleCountCalculate(String... words) {
-        float wordsAll = words.length;
-        float wordsFound = 0;
         List<String> wordsList = Arrays.asList(words);
-        for (String wordInFile : wordsExistList) {
-            if (wordsList.contains(wordInFile)) {
+        Set<String> set = new TreeSet<>(wordsList);
+        float wordsAll = set.size();
+        float wordsFound = 0;
+        String[] wordsForKey = set.toArray(new String[set.size()]);
+        if (cachedResults.get(createStringKey(wordsForKey)) != null) {
+            currentQuality = cachedResults.get(wordsForKey);
+            return;
+        }
+        for (String wordInSet : set) {
+            if (wordsExistList.contains(wordInSet)) {
                 wordsFound++;
-                wordsList.remove(wordInFile);
-            }
-            if (wordsFound == wordsAll) {
-                break;
             }
         }
-        currentQuality = wordsFound / wordsAll;
-        cachedResults.put(createStringKey(words), currentQuality);
+        currentQuality = 100 * (wordsFound / wordsAll);
+        cachedResults.put(createStringKey(wordsForKey), currentQuality);
     }
 
+    protected void relevantCalculate(String... words) {
+        float wordsAll = words.length;
+        currentQuality = 0F;
+        String key = createStringKey(words);
+        if (cachedResults.get(key) != null) {
+            currentQuality = cachedResults.get(key);
+            return;
+        }
+        HashMap<String, List<Integer>> foundMap = new HashMap();
+        for (String searchWord : words) {
+            for (int i = 0; i < wordsList.size(); i++) {
+                List<Integer> foundList = new ArrayList<>();
+                if (wordsList.get(i).equalsIgnoreCase(searchWord)) {
+                    foundList.add(i);
+                }
+                if(foundList.size()>0){
+                    foundMap.put(searchWord, foundList);
+                }
+            }
+        }
+        Set<String> keySet = foundMap.keySet();
+        List<String> keyList = new ArrayList<>(keySet);
+        float base = (1 / wordsAll);
+        if(keyList.size()>1){
+            currentQuality=base;
+        }
+        for (int i = 0; i < keyList.size() - 1; i++) {
+            float coef = (1F /(float) minBetween(foundMap.get(keyList.get(i)), foundMap.get(keyList.get(i + 1))));
+            currentQuality = currentQuality + base * coef;
+        }
+        currentQuality *= 100;
+        cachedResults.put(createStringKey(key), currentQuality);
+    }
+
+    private int minBetween(List<Integer> list1, List<Integer> list2) {
+        int min = Integer.MAX_VALUE;
+        for(Integer int1:list1){
+            for(Integer int2:list2){
+                if(Math.abs(int1-int2)<min){
+                    min=Math.abs(int1-int2);
+                }
+            }
+        }
+        return min;
+    }
     private String createStringKey(String... words) {
         StringBuilder sb = new StringBuilder();
         for (String st : words) {
