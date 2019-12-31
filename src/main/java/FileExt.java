@@ -35,9 +35,9 @@ public class FileExt implements Comparable<FileExt> {
 
     public int compareTo(FileExt other) {
         if (this.getCurrentQuality() > other.getCurrentQuality()) {
-            return 1;
-        } else if (this.getCurrentQuality() < other.getCurrentQuality()) {
             return -1;
+        } else if (this.getCurrentQuality() < other.getCurrentQuality()) {
+            return 1;
         }
         return 0;
     }
@@ -46,7 +46,7 @@ public class FileExt implements Comparable<FileExt> {
         if (words.length == 1) {
             singleCalculate(words[0]);
         } else {
-            simpleCountCalculate(words);
+            relevantCalculate(words);
         }
     }
 
@@ -69,7 +69,7 @@ public class FileExt implements Comparable<FileExt> {
         float wordsFound = 0;
         String[] wordsForKey = set.toArray(new String[set.size()]);
         if (cachedResults.get(createStringKey(wordsForKey)) != null) {
-            currentQuality = cachedResults.get(wordsForKey);
+            currentQuality = cachedResults.get(createStringKey(wordsForKey));
             return;
         }
         for (String wordInSet : set) {
@@ -82,50 +82,76 @@ public class FileExt implements Comparable<FileExt> {
     }
 
     protected void relevantCalculate(String... words) {
-        float wordsAll = words.length;
+        List<String> searchWordsList = Arrays.asList(words);
+        Set<String> set = new TreeSet<>(searchWordsList);
+        float wordsAll = set.size();
+        float wordsFound = 0;
         currentQuality = 0F;
-        String key = createStringKey(words);
+        String[] wordsForKey = set.toArray(new String[set.size()]);
+        String key = createStringKey(wordsForKey);
+
         if (cachedResults.get(key) != null) {
             currentQuality = cachedResults.get(key);
             return;
         }
-        HashMap<String, List<Integer>> foundMap = new HashMap();
-        for (String searchWord : words) {
+        List<List<Integer>> wordsArray = new ArrayList<>();
+        for (String searchWord : set) {
+            List<Integer> positions = new ArrayList<>();
+            boolean alreadyFound = false;
             for (int i = 0; i < wordsList.size(); i++) {
-                List<Integer> foundList = new ArrayList<>();
-                if (wordsList.get(i).equalsIgnoreCase(searchWord)) {
-                    foundList.add(i);
+                if (searchWord.equalsIgnoreCase(wordsList.get(i))) {
+                    if (!alreadyFound) {
+                        wordsFound++;
+                        alreadyFound = true;
+                    }
+                    positions.add(i);
                 }
-                if(foundList.size()>0){
-                    foundMap.put(searchWord, foundList);
-                }
+
+            }
+            if (positions.size() > 0) {
+                wordsArray.add(positions);
             }
         }
-        Set<String> keySet = foundMap.keySet();
-        List<String> keyList = new ArrayList<>(keySet);
-        float base = (1 / wordsAll);
-        if(keyList.size()>1){
-            currentQuality=base;
+        float lenBtwWords = 1;
+        if(wordsArray.size()>1) {
+            lenBtwWords = 0;
+            for (int i = 0; i < wordsArray.size() - 1; i++) {
+                int minlen = Integer.MAX_VALUE;
+                for (int j =  1; j < wordsArray.size(); j++) {
+                    int len = minBetween(wordsArray.get(i), wordsArray.get(j));
+                    if (len < minlen && i!=j) {
+                        minlen = len;
+                    }
+                }
+
+                lenBtwWords += (minlen);
+            }
         }
-        for (int i = 0; i < keyList.size() - 1; i++) {
-            float coef = (1F /(float) minBetween(foundMap.get(keyList.get(i)), foundMap.get(keyList.get(i + 1))));
-            currentQuality = currentQuality + base * coef;
+        float part = 100 / wordsAll;
+
+        currentQuality = 100 * (wordsFound / wordsAll);
+        currentQuality = currentQuality - part;
+        float correctionCoeff=1;
+        if(wordsArray.size()>1){
+            correctionCoeff = (wordsArray.size()-1) / lenBtwWords;
         }
-        currentQuality *= 100;
-        cachedResults.put(createStringKey(key), currentQuality);
+
+        currentQuality = currentQuality + part * correctionCoeff;
+        cachedResults.put(createStringKey(wordsForKey), currentQuality);
     }
 
     private int minBetween(List<Integer> list1, List<Integer> list2) {
         int min = Integer.MAX_VALUE;
-        for(Integer int1:list1){
-            for(Integer int2:list2){
-                if(Math.abs(int1-int2)<min){
-                    min=Math.abs(int1-int2);
+        for (Integer int1 : list1) {
+            for (Integer int2 : list2) {
+                if (Math.abs(int1 - int2) < min) {
+                    min = Math.abs(int1 - int2);
                 }
             }
         }
         return min;
     }
+
     private String createStringKey(String... words) {
         StringBuilder sb = new StringBuilder();
         for (String st : words) {
