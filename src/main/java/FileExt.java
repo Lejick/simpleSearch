@@ -163,6 +163,10 @@ public class FileExt implements Comparable<FileExt> {
 
     protected void singleCalculate(String word) {
         currentQuality = 0F;
+        if (cachedResults.get(word) != null) {
+            currentQuality = cachedResults.get(word);
+            return;
+        }
         if (wordsExistList.contains(word)) {
             currentQuality = 100F;
         }
